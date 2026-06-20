@@ -14,6 +14,8 @@ chat. Processing must remain local.
 - Supported origins: `https://chatgpt.com/*` and legacy
   `https://chat.openai.com/*`.
 - Formats: Markdown, JSON, plain text.
+- Optional timestamp enrichment is checked by default and never blocks text
+  export.
 - Actions: Blob-backed download, clipboard copy, console output.
 - Permissions are limited to the active tab, clipboard writes, and downloads;
   host access is limited by the two ChatGPT content-script match patterns.
@@ -65,9 +67,25 @@ expected total but scraping once only captures currently hydrated turns.
 6. Restore the original `[data-scroll-root].scrollTop`.
 7. Report the difference between turn shells and captured messages as missing.
 
-This approach is intentionally DOM-only. It does not call undocumented ChatGPT
-backend APIs and does not read the `client-bootstrap` script, which can contain
-credentials and private account metadata.
+Message content remains DOM-only. Timestamp enrichment optionally calls the
+undocumented current-conversation metadata endpoint and joins `create_time` to
+the visible branch using `data-message-id`, with `data-turn-id` as fallback. It
+first tries cookie authentication. If required, it obtains a short-lived token
+from `/api/auth/session`, keeps it only in a local function, and never logs,
+persists, or exports it. The extension never reads the `client-bootstrap`
+script, which can contain credentials and private account metadata.
+
+## Timestamp strategy
+
+- Extract a UUID from the current `/c/<conversation-id>` URL.
+- Request `/backend-api/conversation/<conversation-id>` locally.
+- Index `mapping[*].message.create_time` by mapping node ID, node ID, and
+  message ID.
+- Convert seconds, milliseconds, numeric strings, or date strings to ISO 8601.
+- Add `createdAt` to JSON; add an italic ISO line to Markdown; add an ISO label
+  to plain text.
+- Use `null`/no label when a message does not match or metadata is unavailable.
+- Never fail the main export because timestamp enrichment failed.
 
 ## Markdown conversion
 
@@ -94,7 +112,8 @@ Future fixtures must contain only sanitized turn markup.
 
 - `manifest.json`: Manifest V3 metadata and permissions.
 - `popup.html`, `popup.css`, `popup.js`: controls, progress, download/clipboard.
-- `content.js`: hydration, extraction, Markdown conversion, serialization.
+- `content.js`: hydration, extraction, Markdown conversion, serialization, and
+  best-effort timestamp metadata enrichment.
 - `standalone-console.js`: dependency-free, simpler console fallback.
 - `README.md`: installation, use, privacy, limitations.
 - `RUNNING_NOTES.md`: handoff context and implementation decisions.
@@ -112,6 +131,9 @@ Future fixtures must contain only sanitized turn markup.
   download orchestration to a service worker or an in-page progress panel.
 - Rich interactive blocks need sanitized fixture examples before adding custom
   converters.
+- The timestamp endpoint is undocumented. If it changes, preserve
+  `createdAt: null` fallback behavior and do not replace it with bootstrap-token
+  parsing.
 
 ## Verification checklist
 
@@ -120,5 +142,7 @@ Future fixtures must contain only sanitized turn markup.
 - Load unpacked in Chrome, reload ChatGPT, and inspect the detected shell count.
 - Export the supplied 336-turn conversation and confirm message count is 336.
 - Spot-check user newlines, assistant lists, blockquotes, and code blocks.
+- Confirm timestamped JSON and Markdown on a `/c/<UUID>` conversation, then
+  confirm ordinary export still succeeds when the metadata request is blocked.
 - Confirm cancellation and missing-turn warnings.
 - Confirm no token-like strings or full-page fixture data exist in this folder.

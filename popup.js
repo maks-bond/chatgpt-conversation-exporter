@@ -22,6 +22,7 @@ function setBusy(busy) {
   controls.forEach((control) => { control.disabled = busy; });
   $("#format").disabled = busy;
   $("#loadAll").disabled = busy;
+  $("#timestamps").disabled = busy;
   $("#progress").hidden = !busy;
   $("#cancel").hidden = !busy;
 }
@@ -47,7 +48,8 @@ async function run(action) {
       type: "chat-export-run",
       action,
       format: $("#format").value,
-      loadAll: $("#loadAll").checked
+      loadAll: $("#loadAll").checked,
+      includeTimestamps: $("#timestamps").checked
     });
     if (!response?.ok) throw new Error(response?.error || "Export failed.");
 
@@ -65,7 +67,10 @@ async function run(action) {
     const warning = response.missing
       ? ` Warning: ${response.missing} turn(s) could not be hydrated.`
       : "";
-    setStatus(`${response.count} messages, ${response.characters.toLocaleString()} characters.${warning}`);
+    const timestamps = response.timestampsRequested
+      ? ` ${response.timestamps}/${response.count} timestamps found.`
+      : "";
+    setStatus(`${response.count} messages, ${response.characters.toLocaleString()} characters.${timestamps}${warning}`);
   } catch (error) {
     setStatus(error.message, true);
   } finally {

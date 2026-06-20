@@ -1,8 +1,8 @@
 # ChatGPT Conversation Exporter
 
 A local-only Chrome extension that exports the conversation currently open on
-`chatgpt.com`. It supports Markdown, JSON, plain text, clipboard output, and
-DevTools console output.
+`chatgpt.com`. It supports Markdown, JSON, plain text, per-message timestamps,
+clipboard output, and DevTools console output.
 
 ## Install
 
@@ -17,8 +17,10 @@ DevTools console output.
 1. Open the ChatGPT conversation you want to export.
 2. Click the extension toolbar icon.
 3. Keep **Load every virtualized message** checked for a complete export.
-4. Select Markdown, JSON, or plain text.
-5. Click **Download**. This is the recommended action for large conversations.
+4. Keep **Include message dates when available** checked to enrich messages
+   with their server creation times.
+5. Select Markdown, JSON, or plain text.
+6. Click **Download**. This is the recommended action for large conversations.
 
 The page scrolls while the export runs because ChatGPT virtualizes old message
 bodies. Keep the tab open and do not manually scroll until it finishes. The
@@ -42,14 +44,24 @@ better Markdown preservation and diagnostics.
 - Headings, lists, quotes, code blocks, tables, links, and inline formatting in
   assistant responses
 - Turn IDs, message IDs, model names, and attachment labels in JSON
+- Message creation times as ISO 8601 timestamps when ChatGPT metadata provides
+  them; unavailable timestamps remain `null` in JSON
 - Image filenames/alt text, but not private or expiring image URLs
 
 It does not export account data, bootstrap scripts, cookies, access tokens,
 message action buttons, the composer, or sidebar content.
 
+Timestamp enrichment makes a local request to the current conversation's
+ChatGPT metadata endpoint. If that endpoint requires authentication, the
+extension obtains a short-lived session token in memory for that request only.
+It is never logged, persisted, or included in the export. Timestamp failure does
+not prevent the conversation text from exporting.
+
 ## Limitations
 
 - ChatGPT's DOM is not a public API and may change.
+- Message timestamps rely on an undocumented ChatGPT metadata endpoint and may
+  stop working independently of text export.
 - Branch alternatives that are not selected in the visible conversation are
   not exported.
 - Generated widgets, canvases, and rich app results may degrade to visible text.

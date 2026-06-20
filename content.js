@@ -5,6 +5,7 @@
   const MESSAGE_SELECTOR = "[data-message-author-role]";
   const SCROLL_SELECTOR = "[data-scroll-root]";
   const WAIT_PER_TURN_MS = 2500;
+  const CONVERSATION_ID_PATTERN = /\/c\/([a-f0-9-]{36})(?:[/?#]|$)/i;
   let cancelled = false;
   let running = false;
 
@@ -185,6 +186,75 @@
     };
   }
 
+  function conversationIdFromUrl() {
+    return location.pathname.match(CONVERSATION_ID_PATTERN)?.[1] || null;
+  }
+
+  async function fetchConversationMetadata(conversationId) {
+    const path = `/backend-api/conversation/${encodeURIComponent(conversationId)}`;
+    const url = new URL(path, location.origin).href;
+    let response = await fetch(url, { credentials: "include" });
+    if (response.status !== 401 && response.status !== 403) {
+      if (!response.ok) throw new Error(`Conversation metadata request failed (${response.status}).`);
+      return response.json();
+    }
+
+    // Some ChatGPT deployments require the same short-lived bearer token used
+    // by the web app. Keep it only in this function and never log or export it.
+    const sessionUrl = new URL("/api/auth/session", location.origin).href;
+    const sessionResponse = await fetch(sessionUrl, { credentials: "include" });
+    if (!sessionResponse.ok) throw new Error("ChatGPT session metadata was unavailable.");
+    const session = await sessionResponse.json();
+    if (!session.accessToken) throw new Error("ChatGPT session did not provide an access token.");
+    response = await fetch(url, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${session.accessToken}` }
+    });
+    if (!response.ok) throw new Error(`Conversation metadata request failed (${response.status}).`);
+    return response.json();
+  }
+
+  function toIsoTimestamp(value) {
+    if (value === null || value === undefined || value === "") return null;
+    let date;
+    if (typeof value === "number" || /^\d+(?:\.\d+)?$/.test(String(value))) {
+      const numeric = Number(value);
+      date = new Date(numeric < 1e12 ? numeric * 1000 : numeric);
+    } else {
+      date = new Date(value);
+    }
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  async function addTimestamps(result) {
+    result.timestamps = 0;
+    result.timestampStatus = "unavailable";
+    for (const message of result.messages) message.createdAt = null;
+    const conversationId = conversationIdFromUrl();
+    if (!conversationId) return;
+
+    try {
+      const metadata = await fetchConversationMetadata(conversationId);
+      const byId = new Map();
+      for (const [nodeId, node] of Object.entries(metadata.mapping || {})) {
+        const message = node?.message;
+        const timestamp = toIsoTimestamp(message?.create_time);
+        if (!timestamp) continue;
+        byId.set(nodeId, timestamp);
+        if (node?.id) byId.set(node.id, timestamp);
+        if (message?.id) byId.set(message.id, timestamp);
+      }
+
+      for (const message of result.messages) {
+        message.createdAt = byId.get(message.messageId) || byId.get(message.turnId) || null;
+        if (message.createdAt) result.timestamps += 1;
+      }
+      result.timestampStatus = result.timestamps ? "available" : "unavailable";
+    } catch (_error) {
+      // Timestamp enrichment is optional; the DOM export remains valid.
+    }
+  }
+
   function titleFromPage() {
     const raw = document.title.replace(/\s*[-|]\s*ChatGPT\s*$/i, "").trim();
     return raw && raw !== "ChatGPT" ? raw : "ChatGPT Conversation";
@@ -201,11 +271,17 @@
       return JSON.stringify({ title, url: location.href, exportedAt, missingTurns: result.missing, messages: result.messages }, null, 2);
     }
     if (format === "text") {
-      return result.messages.map((message) => `${message.role === "user" ? "USER" : "ASSISTANT"}:\n${message.text || message.markdown}`).join("\n\n---\n\n");
+      return result.messages.map((message) => {
+        const timestamp = message.createdAt ? ` [${message.createdAt}]` : "";
+        return `${message.role === "user" ? "USER" : "ASSISTANT"}${timestamp}:\n${message.text || message.markdown}`;
+      }).join("\n\n---\n\n");
     }
     const header = `# ${title}\n\nExported: ${exportedAt}\n\nSource: ${location.href}`;
     const warning = result.missing ? `\n\n> Warning: ${result.missing} turn(s) could not be loaded.` : "";
-    const body = result.messages.map((message) => `## ${message.role === "user" ? "You" : "ChatGPT"}\n\n${message.markdown}`).join("\n\n---\n\n");
+    const body = result.messages.map((message) => {
+      const timestamp = message.createdAt ? `\n\n*${message.createdAt}*` : "";
+      return `## ${message.role === "user" ? "You" : "ChatGPT"}${timestamp}\n\n${message.markdown}`;
+    }).join("\n\n---\n\n");
     return `${header}${warning}\n\n${body}\n`;
   }
 
@@ -229,6 +305,15 @@
     (async () => {
       try {
         const result = await collectAll(request.loadAll);
+        if (request.includeTimestamps) {
+          chrome.runtime.sendMessage({
+            type: "chat-export-progress",
+            phase: "Adding dates",
+            completed: result.messages.length,
+            total: result.total
+          }).catch(() => {});
+          await addTimestamps(result);
+        }
         const content = render(result, request.format);
         if (request.action === "console") {
           console.group(`ChatGPT export: ${titleFromPage()}`);
@@ -242,6 +327,8 @@
           content,
           count: result.messages.length,
           missing: result.missing,
+          timestampsRequested: Boolean(request.includeTimestamps),
+          timestamps: result.timestamps || 0,
           characters: content.length,
           filename: `${safeFilename(titleFromPage())}.${extensions[request.format] || "txt"}`,
           mime: mimes[request.format] || mimes.text
