@@ -1,0 +1,25 @@
+:root {
+  color-scheme: light dark;
+  font: 14px/1.4 system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-width: 340px;
+  background: Canvas;
+  color: CanvasText;
+}
+
+main { padding: 16px; }
+h1 { font-size: 18px; margin: 0 0 8px; }
+p { margin: 8px 0; }
+label:not(.check) { display: block; font-weight: 600; margin: 14px 0 5px; }
+select { box-sizing: border-box; padding: 7px; width: 100%; }
+.check { display: flex; gap: 8px; margin: 13px 0; }
+.actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; }
+button { cursor: pointer; padding: 8px; }
+button:disabled { cursor: wait; opacity: 0.55; }
+.primary { font-weight: 700; }
+progress { margin-top: 12px; width: 100%; }
+#status { color: GrayText; min-height: 39px; }
+.link { background: none; border: 0; padding: 0; text-decoration: underline; }
