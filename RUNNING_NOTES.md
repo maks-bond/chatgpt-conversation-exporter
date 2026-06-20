@@ -79,6 +79,9 @@ script, which can contain credentials and private account metadata.
 
 - Extract a UUID from the current `/c/<conversation-id>` URL.
 - Request `/backend-api/conversation/<conversation-id>` locally.
+- Retry with the ephemeral session bearer token for `401`, `403`, or `404`;
+  observed ChatGPT deployments return `404` for an otherwise valid but
+  unauthenticated conversation request.
 - Index `mapping[*].message.create_time` by mapping node ID, node ID, and
   message ID.
 - Convert seconds, milliseconds, numeric strings, or date strings to ISO 8601.

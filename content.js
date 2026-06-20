@@ -194,13 +194,16 @@
     const path = `/backend-api/conversation/${encodeURIComponent(conversationId)}`;
     const url = new URL(path, location.origin).href;
     let response = await fetch(url, { credentials: "include" });
-    if (response.status !== 401 && response.status !== 403) {
-      if (!response.ok) throw new Error(`Conversation metadata request failed (${response.status}).`);
+    if (response.ok) {
       return response.json();
+    }
+    if (![401, 403, 404].includes(response.status)) {
+      throw new Error(`Conversation metadata request failed (${response.status}).`);
     }
 
     // Some ChatGPT deployments require the same short-lived bearer token used
-    // by the web app. Keep it only in this function and never log or export it.
+    // by the web app. Unauthenticated requests may deliberately return 404.
+    // Keep the token only in this function and never log or export it.
     const sessionUrl = new URL("/api/auth/session", location.origin).href;
     const sessionResponse = await fetch(sessionUrl, { credentials: "include" });
     if (!sessionResponse.ok) throw new Error("ChatGPT session metadata was unavailable.");
