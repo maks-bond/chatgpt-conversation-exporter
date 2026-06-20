@@ -44,8 +44,8 @@ better Markdown preservation and diagnostics.
 - Headings, lists, quotes, code blocks, tables, links, and inline formatting in
   assistant responses
 - Turn IDs, message IDs, model names, and attachment labels in JSON
-- Message creation times as ISO 8601 timestamps when ChatGPT metadata provides
-  them; unavailable timestamps remain `null` in JSON
+- Message creation times formatted in `America/Los_Angeles`, including the
+  historical `PST`/`PDT` abbreviation and explicit UTC offset
 - Image filenames/alt text, but not private or expiring image URLs
 
 It does not export account data, bootstrap scripts, cookies, access tokens,
@@ -56,6 +56,11 @@ ChatGPT metadata endpoint. If that endpoint requires authentication, the
 extension obtains a short-lived session token in memory for that request only.
 It is never logged, persisted, or included in the export. Timestamp failure does
 not prevent the conversation text from exporting.
+
+Markdown and text output use a timestamp such as
+`2026-06-19 10:34:22 PDT (UTC-07:00)`. Daylight-saving rules are applied for
+each message's date. JSON retains the canonical UTC `createdAt` value and adds
+the display-ready `createdAtPacific` value. Unavailable values remain `null`.
 
 ## Limitations
 

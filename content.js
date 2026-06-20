@@ -6,6 +6,7 @@
   const SCROLL_SELECTOR = "[data-scroll-root]";
   const WAIT_PER_TURN_MS = 2500;
   const CONVERSATION_ID_PATTERN = /\/c\/([a-f0-9-]{36})(?:[/?#]|$)/i;
+  const PACIFIC_TIME_ZONE = "America/Los_Angeles";
   let cancelled = false;
   let running = false;
 
@@ -229,10 +230,42 @@
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
 
+  function formatPacificTimestamp(isoTimestamp) {
+    const date = new Date(isoTimestamp);
+    if (Number.isNaN(date.getTime())) return null;
+    const dateTimeParts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: PACIFIC_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23"
+      }).formatToParts(date).map((part) => [part.type, part.value])
+    );
+    const abbreviation = new Intl.DateTimeFormat("en-US", {
+      timeZone: PACIFIC_TIME_ZONE,
+      timeZoneName: "short"
+    }).formatToParts(date).find((part) => part.type === "timeZoneName")?.value || "PT";
+    const offset = new Intl.DateTimeFormat("en-US", {
+      timeZone: PACIFIC_TIME_ZONE,
+      timeZoneName: "longOffset"
+    }).formatToParts(date).find((part) => part.type === "timeZoneName")?.value
+      .replace("GMT", "UTC") || "UTC";
+    return `${dateTimeParts.year}-${dateTimeParts.month}-${dateTimeParts.day} ` +
+      `${dateTimeParts.hour}:${dateTimeParts.minute}:${dateTimeParts.second} ` +
+      `${abbreviation} (${offset})`;
+  }
+
   async function addTimestamps(result) {
     result.timestamps = 0;
     result.timestampStatus = "unavailable";
-    for (const message of result.messages) message.createdAt = null;
+    for (const message of result.messages) {
+      message.createdAt = null;
+      message.createdAtPacific = null;
+    }
     const conversationId = conversationIdFromUrl();
     if (!conversationId) return;
 
@@ -250,7 +283,8 @@
 
       for (const message of result.messages) {
         message.createdAt = byId.get(message.messageId) || byId.get(message.turnId) || null;
-        if (message.createdAt) result.timestamps += 1;
+        message.createdAtPacific = message.createdAt ? formatPacificTimestamp(message.createdAt) : null;
+        if (message.createdAtPacific) result.timestamps += 1;
       }
       result.timestampStatus = result.timestamps ? "available" : "unavailable";
     } catch (_error) {
@@ -275,14 +309,14 @@
     }
     if (format === "text") {
       return result.messages.map((message) => {
-        const timestamp = message.createdAt ? ` [${message.createdAt}]` : "";
+        const timestamp = message.createdAtPacific ? ` [${message.createdAtPacific}]` : "";
         return `${message.role === "user" ? "USER" : "ASSISTANT"}${timestamp}:\n${message.text || message.markdown}`;
       }).join("\n\n---\n\n");
     }
     const header = `# ${title}\n\nExported: ${exportedAt}\n\nSource: ${location.href}`;
     const warning = result.missing ? `\n\n> Warning: ${result.missing} turn(s) could not be loaded.` : "";
     const body = result.messages.map((message) => {
-      const timestamp = message.createdAt ? `\n\n*${message.createdAt}*` : "";
+      const timestamp = message.createdAtPacific ? `\n\n*${message.createdAtPacific}*` : "";
       return `## ${message.role === "user" ? "You" : "ChatGPT"}${timestamp}\n\n${message.markdown}`;
     }).join("\n\n---\n\n");
     return `${header}${warning}\n\n${body}\n`;

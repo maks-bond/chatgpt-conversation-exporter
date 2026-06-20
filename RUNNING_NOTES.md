@@ -85,8 +85,10 @@ script, which can contain credentials and private account metadata.
 - Index `mapping[*].message.create_time` by mapping node ID, node ID, and
   message ID.
 - Convert seconds, milliseconds, numeric strings, or date strings to ISO 8601.
-- Add `createdAt` to JSON; add an italic ISO line to Markdown; add an ISO label
-  to plain text.
+- Preserve canonical UTC as `createdAt` in JSON and add `createdAtPacific`.
+- Format Markdown/TXT dates in the IANA `America/Los_Angeles` zone as
+  `YYYY-MM-DD HH:mm:ss PST/PDT (UTC-offset)`. `Intl.DateTimeFormat` applies the
+  correct historical daylight-saving offset for each message.
 - Use `null`/no label when a message does not match or metadata is unavailable.
 - Never fail the main export because timestamp enrichment failed.
 
