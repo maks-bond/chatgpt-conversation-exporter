@@ -70,7 +70,8 @@ async function run(action) {
     const timestamps = response.timestampsRequested
       ? ` ${response.timestamps}/${response.count} timestamps found.`
       : "";
-    setStatus(`${response.count} messages, ${response.characters.toLocaleString()} characters.${timestamps}${warning}`);
+    const source = response.source === "metadata" ? " Metadata export." : " DOM export.";
+    setStatus(`${response.count} messages, ${response.characters.toLocaleString()} characters.${timestamps}${source}${warning}`);
   } catch (error) {
     setStatus(error.message, true);
   } finally {

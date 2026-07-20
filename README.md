@@ -22,9 +22,11 @@ clipboard output, and DevTools console output.
 5. Select Markdown, JSON, or plain text.
 6. Click **Download**. This is the recommended action for large conversations.
 
-The page scrolls while the export runs because ChatGPT virtualizes old message
-bodies. Keep the tab open and do not manually scroll until it finishes. The
-extension restores the original scroll position afterward.
+For complete exports, the extension first reads ChatGPT's conversation metadata
+for the selected conversation path. This avoids losing old messages when the
+page only keeps a small virtualized subset mounted in the DOM. If metadata is
+unavailable, it falls back to scrolling the page to hydrate visible turn shells;
+keep the tab open and do not manually scroll until it finishes.
 
 **Copy** uses the clipboard and is convenient for smaller conversations.
 **Console** writes the resulting string to the DevTools console for the ChatGPT
@@ -49,13 +51,14 @@ better Markdown preservation and diagnostics.
 - Image filenames/alt text, but not private or expiring image URLs
 
 It does not export account data, bootstrap scripts, cookies, access tokens,
-message action buttons, the composer, or sidebar content.
+message action buttons, the composer, sidebar content, hidden context records,
+or reasoning/thought metadata.
 
-Timestamp enrichment makes a local request to the current conversation's
-ChatGPT metadata endpoint. If that endpoint requires authentication, the
-extension obtains a short-lived session token in memory for that request only.
-It is never logged, persisted, or included in the export. Timestamp failure does
-not prevent the conversation text from exporting.
+Complete export and timestamp enrichment make a local request to the current
+conversation's ChatGPT metadata endpoint. If that endpoint requires
+authentication, the extension obtains a short-lived session token in memory for
+that request only. It is never logged, persisted, or included in the export.
+If metadata is unavailable, the extension falls back to the DOM export path.
 
 Markdown and text output use a timestamp such as
 `2026-06-19 10:34:22 PDT (UTC-07:00)`. Daylight-saving rules are applied for
@@ -65,8 +68,9 @@ the display-ready `createdAtPacific` value. Unavailable values remain `null`.
 ## Limitations
 
 - ChatGPT's DOM is not a public API and may change.
-- Message timestamps rely on an undocumented ChatGPT metadata endpoint and may
-  stop working independently of text export.
+- Complete message export and timestamps rely on an undocumented ChatGPT
+  metadata endpoint. If that endpoint changes, the extension falls back to DOM
+  extraction, which may only include currently mounted messages.
 - Branch alternatives that are not selected in the visible conversation are
   not exported.
 - Generated widgets, canvases, and rich app results may degrade to visible text.
@@ -91,8 +95,9 @@ to invalidate the session before continuing.
   page, is open.
 - **Reload after installing:** A statically declared content script is added to
   tabs only after they load.
-- **Missing turns:** Run the export again without interacting with the page. If
-  the same turn fails, capture only that turn's sanitized `<section>` element.
+- **Incomplete text output:** Reload the extension in `chrome://extensions`,
+  refresh the ChatGPT tab, and run the export with **Load every virtualized
+  message** checked. The success message should say `Metadata export`.
 - **Selector changes:** See `RUNNING_NOTES.md` for the selector strategy.
 
 Chrome extension structure follows the official Manifest V3 content-script and

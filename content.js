@@ -7,6 +7,7 @@
   const WAIT_PER_TURN_MS = 2500;
   const CONVERSATION_ID_PATTERN = /\/c\/([a-f0-9-]{36})(?:[/?#]|$)/i;
   const PACIFIC_TIME_ZONE = "America/Los_Angeles";
+  const EXPORTABLE_METADATA_CONTENT_TYPES = new Set(["text", "multimodal_text", "code"]);
   let cancelled = false;
   let running = false;
 
@@ -183,7 +184,8 @@
     return {
       messages: Array.from(messages.values()).sort((a, b) => a.index - b.index),
       total: turns.length,
-      missing: turns.length - messages.size
+      missing: turns.length - messages.size,
+      source: "dom"
     };
   }
 
@@ -216,6 +218,116 @@
     });
     if (!response.ok) throw new Error(`Conversation metadata request failed (${response.status}).`);
     return response.json();
+  }
+
+  function messageTextFromMetadata(message) {
+    const content = message?.content;
+    if (!content) return "";
+
+    if (typeof content.text === "string") return normalize(content.text);
+    if (!Array.isArray(content.parts)) return "";
+
+    return normalize(content.parts.map((part) => {
+      if (typeof part === "string") return part;
+      if (typeof part?.text === "string") return part.text;
+      if (typeof part?.content === "string") return part.content;
+      if (typeof part?.name === "string") return `[Attachment: ${part.name}]`;
+      return "";
+    }).filter(Boolean).join("\n\n"));
+  }
+
+  function isExportableMetadataMessage(message) {
+    const role = message?.author?.role;
+    if (role !== "user" && role !== "assistant") return false;
+    if (!EXPORTABLE_METADATA_CONTENT_TYPES.has(message?.content?.content_type)) return false;
+
+    const metadata = message.metadata || {};
+    return !metadata.is_visually_hidden_from_conversation &&
+      !metadata.is_hidden &&
+      !metadata.hidden &&
+      !metadata.is_redacted;
+  }
+
+  function selectedMetadataNodes(metadata) {
+    const mapping = metadata?.mapping || {};
+    const currentNode = metadata?.current_node;
+    if (currentNode && mapping[currentNode]) {
+      const path = [];
+      const seen = new Set();
+      let nodeId = currentNode;
+      while (nodeId && mapping[nodeId] && !seen.has(nodeId)) {
+        seen.add(nodeId);
+        path.push([nodeId, mapping[nodeId]]);
+        nodeId = mapping[nodeId].parent;
+      }
+      return path.reverse();
+    }
+
+    return Object.entries(mapping).sort(([, left], [, right]) => {
+      const leftTime = left?.message?.create_time || 0;
+      const rightTime = right?.message?.create_time || 0;
+      return leftTime - rightTime;
+    });
+  }
+
+  function applyTimestampsFromMetadata(result, metadata) {
+    result.timestamps = 0;
+    result.timestampStatus = "unavailable";
+
+    const byId = new Map();
+    for (const [nodeId, node] of Object.entries(metadata?.mapping || {})) {
+      const message = node?.message;
+      const timestamp = toIsoTimestamp(message?.create_time);
+      if (!timestamp) continue;
+      byId.set(nodeId, timestamp);
+      if (node?.id) byId.set(node.id, timestamp);
+      if (message?.id) byId.set(message.id, timestamp);
+    }
+
+    for (const message of result.messages) {
+      message.createdAt = byId.get(message.messageId) || byId.get(message.turnId) || null;
+      message.createdAtPacific = message.createdAt ? formatPacificTimestamp(message.createdAt) : null;
+      if (message.createdAtPacific) result.timestamps += 1;
+    }
+    result.timestampStatus = result.timestamps ? "available" : "unavailable";
+  }
+
+  async function collectFromMetadata(includeTimestamps) {
+    const conversationId = conversationIdFromUrl();
+    if (!conversationId) throw new Error("No conversation ID was found in the current URL.");
+
+    const metadata = await fetchConversationMetadata(conversationId);
+    const messages = [];
+
+    for (const [nodeId, node] of selectedMetadataNodes(metadata)) {
+      const raw = node?.message;
+      if (!isExportableMetadataMessage(raw)) continue;
+
+      const text = messageTextFromMetadata(raw);
+      if (!text) continue;
+
+      messages.push({
+        index: messages.length + 1,
+        turnId: nodeId,
+        messageId: raw.id || node?.id || null,
+        role: raw.author.role,
+        model: raw.metadata?.model_slug || raw.metadata?.model || null,
+        markdown: text,
+        text,
+        attachments: []
+      });
+    }
+
+    if (!messages.length) throw new Error("Conversation metadata did not contain exportable messages.");
+
+    const result = {
+      messages,
+      total: messages.length,
+      missing: 0,
+      source: "metadata"
+    };
+    if (includeTimestamps) applyTimestampsFromMetadata(result, metadata);
+    return result;
   }
 
   function toIsoTimestamp(value) {
@@ -271,22 +383,7 @@
 
     try {
       const metadata = await fetchConversationMetadata(conversationId);
-      const byId = new Map();
-      for (const [nodeId, node] of Object.entries(metadata.mapping || {})) {
-        const message = node?.message;
-        const timestamp = toIsoTimestamp(message?.create_time);
-        if (!timestamp) continue;
-        byId.set(nodeId, timestamp);
-        if (node?.id) byId.set(node.id, timestamp);
-        if (message?.id) byId.set(message.id, timestamp);
-      }
-
-      for (const message of result.messages) {
-        message.createdAt = byId.get(message.messageId) || byId.get(message.turnId) || null;
-        message.createdAtPacific = message.createdAt ? formatPacificTimestamp(message.createdAt) : null;
-        if (message.createdAtPacific) result.timestamps += 1;
-      }
-      result.timestampStatus = result.timestamps ? "available" : "unavailable";
+      applyTimestampsFromMetadata(result, metadata);
     } catch (_error) {
       // Timestamp enrichment is optional; the DOM export remains valid.
     }
@@ -305,7 +402,14 @@
     const title = titleFromPage();
     const exportedAt = new Date().toISOString();
     if (format === "json") {
-      return JSON.stringify({ title, url: location.href, exportedAt, missingTurns: result.missing, messages: result.messages }, null, 2);
+      return JSON.stringify({
+        title,
+        url: location.href,
+        exportedAt,
+        source: result.source || "unknown",
+        missingTurns: result.missing,
+        messages: result.messages
+      }, null, 2);
     }
     if (format === "text") {
       return result.messages.map((message) => {
@@ -341,8 +445,24 @@
     running = true;
     (async () => {
       try {
-        const result = await collectAll(request.loadAll);
-        if (request.includeTimestamps) {
+        let result;
+        if (request.loadAll) {
+          chrome.runtime.sendMessage({
+            type: "chat-export-progress",
+            phase: "Reading metadata",
+            completed: 0,
+            total: 1
+          }).catch(() => {});
+          try {
+            result = await collectFromMetadata(request.includeTimestamps);
+          } catch (_error) {
+            result = await collectAll(true);
+          }
+        } else {
+          result = await collectAll(false);
+        }
+
+        if (request.includeTimestamps && result.timestampStatus !== "available") {
           chrome.runtime.sendMessage({
             type: "chat-export-progress",
             phase: "Adding dates",
@@ -366,6 +486,7 @@
           missing: result.missing,
           timestampsRequested: Boolean(request.includeTimestamps),
           timestamps: result.timestamps || 0,
+          source: result.source || "unknown",
           characters: content.length,
           filename: `${safeFilename(titleFromPage())}.${extensions[request.format] || "txt"}`,
           mime: mimes[request.format] || mimes.text
