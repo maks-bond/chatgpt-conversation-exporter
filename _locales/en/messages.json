@@ -1,0 +1,75 @@
+{
+  "extensionName": { "message": "ChatGPT Conversation Exporter", "description": "Extension name" },
+  "extensionDescription": { "message": "Export the current ChatGPT conversation to Markdown, JSON, or text.", "description": "Extension description" },
+  "actionTitle": { "message": "Export ChatGPT conversation", "description": "Toolbar action title" },
+  "popupTitle": { "message": "Conversation Exporter" },
+  "popupHeading": { "message": "Conversation Exporter" },
+  "inspectingTab": { "message": "Inspecting the current tab..." },
+  "formatLabel": { "message": "Format" },
+  "formatMarkdown": { "message": "Markdown (.md)" },
+  "formatJson": { "message": "JSON (.json)" },
+  "formatText": { "message": "Plain text (.txt)" },
+  "loadAllLabel": { "message": "Load every virtualized message" },
+  "timestampsLabel": { "message": "Include message dates when available" },
+  "downloadButton": { "message": "Download" },
+  "copyButton": { "message": "Copy" },
+  "consoleButton": { "message": "Console" },
+  "initialStatus": { "message": "Open a conversation, then choose an action." },
+  "cancelButton": { "message": "Cancel loading" },
+  "errorNoActiveTab": { "message": "No active browser tab was found." },
+  "errorReloadTab": { "message": "Reload the ChatGPT tab after installing the extension, then try again." },
+  "progressStatus": {
+    "message": "$PHASE$: $COMPLETED$/$TOTAL$ turns captured",
+    "placeholders": {
+      "phase": { "content": "$1" },
+      "completed": { "content": "$2" },
+      "total": { "content": "$3" }
+    }
+  },
+  "startingExport": { "message": "Starting export..." },
+  "errorExportFailed": { "message": "Export failed." },
+  "warningMissingTurns": {
+    "message": "Warning: $COUNT$ turn(s) could not be hydrated.",
+    "placeholders": { "count": { "content": "$1" } }
+  },
+  "timestampsFound": {
+    "message": "$FOUND$/$TOTAL$ timestamps found.",
+    "placeholders": {
+      "found": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+  "collectionMethodMetadata": { "message": "Metadata export." },
+  "collectionMethodDom": { "message": "DOM export." },
+  "exportSummary": {
+    "message": "$COUNT$ messages, $CHARACTERS$ characters.",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "characters": { "content": "$2" }
+    }
+  },
+  "cancellationRequested": { "message": "Cancellation requested..." },
+  "errorNotChatGPT": { "message": "The active tab is not ChatGPT." },
+  "turnsFound": {
+    "message": "$TURNS$ turn shells found; $LOADED$ currently loaded.",
+    "placeholders": {
+      "turns": { "content": "$1" },
+      "loaded": { "content": "$2" }
+    }
+  },
+  "noTurnsFound": { "message": "No conversation turns found on this page." },
+  "errorNoConversation": { "message": "No ChatGPT conversation was found on this page." },
+  "errorExportCancelled": { "message": "Export cancelled." },
+  "phaseLoading": { "message": "Loading" },
+  "errorMetadataRequest": {
+    "message": "Conversation metadata request failed ($STATUS$).",
+    "placeholders": { "status": { "content": "$1" } }
+  },
+  "errorSessionUnavailable": { "message": "ChatGPT session metadata was unavailable." },
+  "errorAccessTokenUnavailable": { "message": "ChatGPT session did not provide an access token." },
+  "errorNoConversationId": { "message": "No conversation ID was found in the current URL." },
+  "errorNoExportableMessages": { "message": "Conversation metadata did not contain exportable messages." },
+  "errorExportAlreadyRunning": { "message": "An export is already running in this tab." },
+  "phaseReadingMetadata": { "message": "Reading metadata" },
+  "phaseAddingDates": { "message": "Adding dates" }
+}
