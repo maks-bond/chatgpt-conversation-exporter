@@ -4,6 +4,11 @@ A local-only Chrome extension that exports the conversation currently open on
 `chatgpt.com`. It supports Markdown, JSON, plain text, per-message timestamps,
 clipboard output, and DevTools console output.
 
+The extension interface follows Chrome's UI language and currently supports
+English (the default locale) and Korean. Exported Markdown, JSON, and plain-text
+documents keep their existing English labels and stable field names regardless
+of the interface language.
+
 ## Install
 
 1. Open `chrome://extensions` in Chrome.

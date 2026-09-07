@@ -3,40 +3,40 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Conversation Exporter</title>
+    <title data-i18n="popupTitle">Conversation Exporter</title>
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
     <main>
-      <h1>Conversation Exporter</h1>
-      <p id="summary">Inspecting the current tab...</p>
+      <h1 data-i18n="popupHeading">Conversation Exporter</h1>
+      <p id="summary" data-i18n="inspectingTab">Inspecting the current tab...</p>
 
-      <label for="format">Format</label>
+      <label for="format" data-i18n="formatLabel">Format</label>
       <select id="format">
-        <option value="markdown">Markdown (.md)</option>
-        <option value="json">JSON (.json)</option>
-        <option value="text">Plain text (.txt)</option>
+        <option value="markdown" data-i18n="formatMarkdown">Markdown (.md)</option>
+        <option value="json" data-i18n="formatJson">JSON (.json)</option>
+        <option value="text" data-i18n="formatText">Plain text (.txt)</option>
       </select>
 
       <label class="check">
         <input id="loadAll" type="checkbox" checked>
-        Load every virtualized message
+        <span data-i18n="loadAllLabel">Load every virtualized message</span>
       </label>
 
       <label class="check">
         <input id="timestamps" type="checkbox" checked>
-        Include message dates when available
+        <span data-i18n="timestampsLabel">Include message dates when available</span>
       </label>
 
       <div class="actions">
-        <button id="download" class="primary">Download</button>
-        <button id="copy">Copy</button>
-        <button id="console">Console</button>
+        <button id="download" class="primary" data-i18n="downloadButton">Download</button>
+        <button id="copy" data-i18n="copyButton">Copy</button>
+        <button id="console" data-i18n="consoleButton">Console</button>
       </div>
 
       <progress id="progress" max="1" value="0" hidden></progress>
-      <p id="status" role="status">Open a conversation, then choose an action.</p>
-      <button id="cancel" class="link" hidden>Cancel loading</button>
+      <p id="status" role="status" data-i18n="initialStatus">Open a conversation, then choose an action.</p>
+      <button id="cancel" class="link" hidden data-i18n="cancelButton">Cancel loading</button>
     </main>
     <script src="popup.js"></script>
   </body>

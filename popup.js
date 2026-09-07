@@ -2,9 +2,22 @@ const $ = (selector) => document.querySelector(selector);
 const controls = [$("#download"), $("#copy"), $("#console")];
 let activeTabId;
 
+function t(key, substitutions) {
+  return chrome.i18n.getMessage(key, substitutions);
+}
+
+function localizeDocument() {
+  document.documentElement.lang = chrome.i18n.getUILanguage();
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    element.textContent = t(element.dataset.i18n);
+  });
+}
+
+localizeDocument();
+
 async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active browser tab was found.");
+  if (!tab?.id) throw new Error(t("errorNoActiveTab"));
   activeTabId = tab.id;
   return tab;
 }
@@ -14,7 +27,7 @@ async function send(message) {
   try {
     return await chrome.tabs.sendMessage(activeTabId, message);
   } catch (error) {
-    throw new Error("Reload the ChatGPT tab after installing the extension, then try again.");
+    throw new Error(t("errorReloadTab"));
   }
 }
 
@@ -36,13 +49,13 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type !== "chat-export-progress") return;
   $("#progress").max = Math.max(message.total, 1);
   $("#progress").value = message.completed;
-  setStatus(`${message.phase}: ${message.completed}/${message.total} turns captured`);
+  setStatus(t("progressStatus", [message.phase, String(message.completed), String(message.total)]));
 });
 
 async function run(action) {
   setBusy(true);
   $("#progress").value = 0;
-  setStatus("Starting export...");
+  setStatus(t("startingExport"));
   try {
     const response = await send({
       type: "chat-export-run",
@@ -51,7 +64,7 @@ async function run(action) {
       loadAll: $("#loadAll").checked,
       includeTimestamps: $("#timestamps").checked
     });
-    if (!response?.ok) throw new Error(response?.error || "Export failed.");
+    if (!response?.ok) throw new Error(response?.error || t("errorExportFailed"));
 
     if (action === "download") {
       const url = URL.createObjectURL(new Blob([response.content], { type: response.mime }));
@@ -65,13 +78,15 @@ async function run(action) {
     }
 
     const warning = response.missing
-      ? ` Warning: ${response.missing} turn(s) could not be hydrated.`
+      ? ` ${t("warningMissingTurns", String(response.missing))}`
       : "";
     const timestamps = response.timestampsRequested
-      ? ` ${response.timestamps}/${response.count} timestamps found.`
+      ? ` ${t("timestampsFound", [String(response.timestamps), String(response.count)])}`
       : "";
-    const source = response.source === "metadata" ? " Metadata export." : " DOM export.";
-    setStatus(`${response.count} messages, ${response.characters.toLocaleString()} characters.${timestamps}${source}${warning}`);
+    const source = response.source === "metadata"
+      ? t("collectionMethodMetadata")
+      : t("collectionMethodDom");
+    setStatus(`${t("exportSummary", [String(response.count), response.characters.toLocaleString()])} ${source}${timestamps}${warning}`);
   } catch (error) {
     setStatus(error.message, true);
   } finally {
@@ -84,19 +99,19 @@ $("#copy").addEventListener("click", () => run("copy"));
 $("#console").addEventListener("click", () => run("console"));
 $("#cancel").addEventListener("click", async () => {
   await send({ type: "chat-export-cancel" });
-  setStatus("Cancellation requested...");
+  setStatus(t("cancellationRequested"));
 });
 
 (async () => {
   try {
     const tab = await getActiveTab();
     if (!/^https:\/\/(chatgpt\.com|chat\.openai\.com)\//.test(tab.url || "")) {
-      throw new Error("The active tab is not ChatGPT.");
+      throw new Error(t("errorNotChatGPT"));
     }
     const info = await send({ type: "chat-export-inspect" });
     $("#summary").textContent = info.turns
-      ? `${info.turns} turn shells found; ${info.loaded} currently loaded.`
-      : "No conversation turns found on this page.";
+      ? t("turnsFound", [String(info.turns), String(info.loaded)])
+      : t("noTurnsFound");
   } catch (error) {
     $("#summary").textContent = error.message;
     controls.forEach((control) => { control.disabled = true; });

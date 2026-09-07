@@ -12,6 +12,7 @@
   let running = false;
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const t = (key, substitutions) => chrome.i18n.getMessage(key, substitutions);
 
   function normalize(text) {
     return text
@@ -144,7 +145,7 @@
 
   async function collectAll(loadAll) {
     const turns = Array.from(document.querySelectorAll(TURN_SELECTOR));
-    if (!turns.length) throw new Error("No ChatGPT conversation was found on this page.");
+    if (!turns.length) throw new Error(t("errorNoConversation"));
     const scrollRoot = document.querySelector(SCROLL_SELECTOR);
     const originalTop = scrollRoot?.scrollTop || 0;
     const messages = new Map();
@@ -161,7 +162,7 @@
     try {
       if (loadAll) {
         for (let index = 0; index < turns.length; index += 1) {
-          if (cancelled) throw new Error("Export cancelled.");
+          if (cancelled) throw new Error(t("errorExportCancelled"));
           const turn = turns[index];
           if (!messages.has(turn.dataset.turnId)) {
             turn.scrollIntoView({ block: "center", behavior: "instant" });
@@ -171,7 +172,7 @@
           }
           chrome.runtime.sendMessage({
             type: "chat-export-progress",
-            phase: "Loading",
+            phase: t("phaseLoading"),
             completed: messages.size,
             total: turns.length
           }).catch(() => {});
@@ -201,7 +202,7 @@
       return response.json();
     }
     if (![401, 403, 404].includes(response.status)) {
-      throw new Error(`Conversation metadata request failed (${response.status}).`);
+      throw new Error(t("errorMetadataRequest", String(response.status)));
     }
 
     // Some ChatGPT deployments require the same short-lived bearer token used
@@ -209,14 +210,14 @@
     // Keep the token only in this function and never log or export it.
     const sessionUrl = new URL("/api/auth/session", location.origin).href;
     const sessionResponse = await fetch(sessionUrl, { credentials: "include" });
-    if (!sessionResponse.ok) throw new Error("ChatGPT session metadata was unavailable.");
+    if (!sessionResponse.ok) throw new Error(t("errorSessionUnavailable"));
     const session = await sessionResponse.json();
-    if (!session.accessToken) throw new Error("ChatGPT session did not provide an access token.");
+    if (!session.accessToken) throw new Error(t("errorAccessTokenUnavailable"));
     response = await fetch(url, {
       credentials: "include",
       headers: { Authorization: `Bearer ${session.accessToken}` }
     });
-    if (!response.ok) throw new Error(`Conversation metadata request failed (${response.status}).`);
+    if (!response.ok) throw new Error(t("errorMetadataRequest", String(response.status)));
     return response.json();
   }
 
@@ -294,7 +295,7 @@
 
   async function collectFromMetadata(includeTimestamps) {
     const conversationId = conversationIdFromUrl();
-    if (!conversationId) throw new Error("No conversation ID was found in the current URL.");
+    if (!conversationId) throw new Error(t("errorNoConversationId"));
 
     const metadata = await fetchConversationMetadata(conversationId);
     const messages = [];
@@ -318,7 +319,7 @@
       });
     }
 
-    if (!messages.length) throw new Error("Conversation metadata did not contain exportable messages.");
+    if (!messages.length) throw new Error(t("errorNoExportableMessages"));
 
     const result = {
       messages,
@@ -438,7 +439,7 @@
     }
     if (request?.type !== "chat-export-run") return false;
     if (running) {
-      sendResponse({ ok: false, error: "An export is already running in this tab." });
+      sendResponse({ ok: false, error: t("errorExportAlreadyRunning") });
       return false;
     }
 
@@ -449,7 +450,7 @@
         if (request.loadAll) {
           chrome.runtime.sendMessage({
             type: "chat-export-progress",
-            phase: "Reading metadata",
+            phase: t("phaseReadingMetadata"),
             completed: 0,
             total: 1
           }).catch(() => {});
@@ -465,7 +466,7 @@
         if (request.includeTimestamps && result.timestampStatus !== "available") {
           chrome.runtime.sendMessage({
             type: "chat-export-progress",
-            phase: "Adding dates",
+            phase: t("phaseAddingDates"),
             completed: result.messages.length,
             total: result.total
           }).catch(() => {});

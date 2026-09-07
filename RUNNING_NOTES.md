@@ -21,6 +21,8 @@ chat. Processing must remain local.
   host access is limited by the two ChatGPT content-script match patterns.
 - Standalone console fallback in `standalone-console.js`.
 - No build step and no third-party dependencies.
+- Chrome-native i18n with English as the default locale and Korean as the only
+  additional locale. Exported document labels remain English.
 
 ## Observed ChatGPT DOM (2026-06-19)
 
@@ -116,6 +118,8 @@ Future fixtures must contain only sanitized turn markup.
 ## Files
 
 - `manifest.json`: Manifest V3 metadata and permissions.
+- `_locales/en/messages.json`, `_locales/ko/messages.json`: extension metadata,
+  popup UI, progress, and user-facing error messages.
 - `popup.html`, `popup.css`, `popup.js`: controls, progress, download/clipboard.
 - `content.js`: hydration, extraction, Markdown conversion, serialization, and
   best-effort timestamp metadata enrichment.
@@ -143,6 +147,8 @@ Future fixtures must contain only sanitized turn markup.
 ## Verification checklist
 
 - Parse `manifest.json` as JSON.
+- Parse both locale catalogs and confirm that their message keys and
+  placeholders match.
 - Run `node --check` on JavaScript files.
 - Load unpacked in Chrome, reload ChatGPT, and inspect the detected shell count.
 - Export the supplied 336-turn conversation and confirm message count is 336.
