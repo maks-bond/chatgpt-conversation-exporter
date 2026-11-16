@@ -14,7 +14,7 @@ async function send(message) {
   try {
     return await chrome.tabs.sendMessage(activeTabId, message);
   } catch (error) {
-    throw new Error("Reload the ChatGPT tab after installing the extension, then try again.");
+    throw new Error("Reload the conversation tab after installing the extension, then try again.");
   }
 }
 
@@ -90,12 +90,12 @@ $("#cancel").addEventListener("click", async () => {
 (async () => {
   try {
     const tab = await getActiveTab();
-    if (!/^https:\/\/(chatgpt\.com|chat\.openai\.com)\//.test(tab.url || "")) {
-      throw new Error("The active tab is not ChatGPT.");
+    if (!/^https:\/\/(chatgpt\.com|chat\.openai\.com|claude\.ai)\//.test(tab.url || "")) {
+      throw new Error("The active tab is not ChatGPT or Claude.");
     }
     const info = await send({ type: "chat-export-inspect" });
     $("#summary").textContent = info.turns
-      ? `${info.turns} turn shells found; ${info.loaded} currently loaded.`
+      ? `${info.site}: ${info.turns} messages found; ${info.loaded} currently loaded.`
       : "No conversation turns found on this page.";
   } catch (error) {
     $("#summary").textContent = error.message;

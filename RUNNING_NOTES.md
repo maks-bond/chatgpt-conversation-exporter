@@ -113,12 +113,45 @@ account IDs, and approximate location. It must never be committed as a fixture.
 The user was advised to sign out everywhere to invalidate the exposed session.
 Future fixtures must contain only sanitized turn markup.
 
+## Claude support (2026-11-15)
+
+Code layout: `shared.js` (Markdown conversion, timestamps, rendering, message
+listener) is loaded before a per-site adapter, `chatgpt.js` or `claude.js`.
+Adapters call `ChatExport.register({ name, assistantLabel, title, inspect,
+collect })`. Adapters set `createdAt`; `shared.js` derives `createdAtPacific`.
+
+Claude metadata path:
+
+- Conversation ID from `/chat/<uuid>`, else the composer's
+  `data-chat-input-conversation` attribute.
+- Org IDs from the `lastActiveOrg` cookie, then `GET /api/organizations`.
+- `GET /api/organizations/<org>/chat_conversations/<id>?tree=True&rendering_mode=messages&render_all_tools=true`.
+- Walk `parent_message_uuid` back from `current_leaf_message_uuid` (selected
+  branch); fall back to sorting by `index`.
+- `sender` `human`/`assistant` maps to `user`/`assistant`; only `content[]`
+  blocks with `type: "text"` are kept (legacy `text` field as fallback).
+
+Claude DOM (observed 2026-11-15): rows are
+`[data-testid="transcript-row"][data-index]` inside
+`[data-autoscroll-container]`; off-screen rows are removed and replaced by
+`transcript-spacer` divs, so there are no shells. The total comes from
+`[role=article][aria-setsize]`. User text is `[data-testid="user-message"]`
+(full text is present even when visually collapsed). Assistant text is every
+`.standard-markdown` inside `[data-testid="assistant-message"]`; the
+`TurnStatus` thinking summary sits outside it. `time[datetime]` exists only
+where the message action bar has rendered. Buttons, SVGs, `aria-hidden`, and
+`.sr-only` nodes are stripped before conversion.
+
+Not yet verified against a live claude.ai session; only against a sanitized
+fixture of the supplied markup.
+
 ## Files
 
 - `manifest.json`: Manifest V3 metadata and permissions.
 - `popup.html`, `popup.css`, `popup.js`: controls, progress, download/clipboard.
-- `content.js`: hydration, extraction, Markdown conversion, serialization, and
-  best-effort timestamp metadata enrichment.
+- `shared.js`: Markdown conversion, timestamp formatting, rendering, messaging.
+- `chatgpt.js`: ChatGPT hydration, extraction, and metadata enrichment.
+- `claude.js`: Claude conversation API export and virtualized-DOM fallback.
 - `standalone-console.js`: dependency-free, simpler console fallback.
 - `README.md`: installation, use, privacy, limitations.
 - `RUNNING_NOTES.md`: handoff context and implementation decisions.
@@ -127,7 +160,7 @@ Future fixtures must contain only sanitized turn markup.
 
 - If ChatGPT replaces `data-turn`, `data-turn-id`, or
   `data-message-author-role`, update the selector constants at the top of
-  `content.js`.
+  `chatgpt.js` (or `claude.js` for Claude).
 - If hydration becomes slower, increase `WAIT_PER_TURN_MS` or wait on a
   `MutationObserver` rather than polling every 80 ms.
 - Extremely long conversations may take several minutes because every

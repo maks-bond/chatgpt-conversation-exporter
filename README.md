@@ -1,7 +1,7 @@
-# ChatGPT Conversation Exporter
+# ChatGPT & Claude Conversation Exporter
 
 A local-only Chrome extension that exports the conversation currently open on
-`chatgpt.com`. It supports Markdown, JSON, plain text, per-message timestamps,
+`chatgpt.com` or `claude.ai`. It supports Markdown, JSON, plain text, per-message timestamps,
 clipboard output, and DevTools console output.
 
 ## Install
@@ -27,6 +27,21 @@ for the selected conversation path. This avoids losing old messages when the
 page only keeps a small virtualized subset mounted in the DOM. If metadata is
 unavailable, it falls back to scrolling the page to hydrate visible turn shells;
 keep the tab open and do not manually scroll until it finishes.
+
+### Claude
+
+On `claude.ai` the extension reads the conversation from Claude's own
+conversation API (the same one the web app uses, authenticated by your existing
+cookies). That returns every message on the branch you are viewing, with
+server timestamps, regardless of how much of the transcript is mounted. Only
+visible text is exported: thinking, tool calls, and tool results are skipped;
+attached files appear as `[Attachment: name]`.
+
+If that request fails, it falls back to the DOM: it scrolls to the top until no
+earlier messages load, then sweeps down the virtualized transcript, capturing
+each row as it mounts. In that mode timestamps are only available for messages
+whose action bar rendered a date, and rows that never mounted are reported as
+missing.
 
 **Copy** uses the clipboard and is convenient for smaller conversations.
 **Console** writes the resulting string to the DevTools console for the ChatGPT
